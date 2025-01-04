@@ -119,6 +119,8 @@ typedef struct FFAUTOLOGON
     bool enable_auto_logon(LPCWSTR user_name, LPCWSTR password, bool enable = true);
 } FFAUTOLOGON;
 
+#define MAX_PASS 512
+
 INT_PTR CALLBACK
 PasswordDlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -135,6 +137,8 @@ PasswordDlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             SetDlgItemText(hwnd, edt2, user_name);
             SetFocus(GetDlgItem(hwnd, edt1));
+
+            SendDlgItemMessage(hwnd, edt1, EM_LIMITTEXT, MAX_PASS - 1, 0);
         }
         return FALSE;
     case WM_COMMAND:
@@ -143,7 +147,7 @@ PasswordDlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDOK:
             {
                 FFAUTOLOGON *pThis = (FFAUTOLOGON *)GetWindowLongPtr(hwnd, DWLP_USER);
-                TCHAR password[512];
+                TCHAR password[MAX_PASS];
                 GetDlgItemText(hwnd, edt1, password, _countof(password));
                 pThis->m_password = password;
                 EndDialog(hwnd, IDOK);
