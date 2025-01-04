@@ -62,6 +62,7 @@ LPCTSTR get_text(INT id)
         case 14: return TEXT("エラー: 値 DefaultPassword のセットに失敗しました。\n");
         case 15: return TEXT("エラー: 値 AutoAdminLogon のセットに失敗しました。\n");
         case 16: return TEXT("エラー: オプション -rot13_pass には引数が必要です。\n");
+        case 17: return TEXT("ユーザーによって処理はキャンセルされました。\n");
         }
     }
     else // The others are Let's la English
@@ -97,6 +98,7 @@ LPCTSTR get_text(INT id)
         case 14: return TEXT("ERROR: Failed to set value DefaultPassword.\n");
         case 15: return TEXT("ERROR: Failed to set value AutoAdminLogon.\n");
         case 16: return TEXT("ERROR: Option -rot13_pass needs an operand.\n");
+        case 17: return TEXT("The operation was canceled by the user.\n");
         }
     }
 
@@ -358,7 +360,10 @@ int FFAUTOLOGON::run(void)
     {
         if (DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_PASSWORD), NULL,
                            PasswordDlgProc, (LPARAM)this) == IDCANCEL)
+        {
+            _ftprintf(stderr, get_text(17));
             return 1;
+        }
     }
 
     if (m_enable)
