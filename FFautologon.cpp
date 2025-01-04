@@ -116,16 +116,12 @@ void usage(void)
 std::wstring rot13(const std::wstring& value)
 {
     std::wstring result = value;
-    for (wchar_t& c : result)
+    for (wchar_t& ch : result)
     {
-        if (c >= L'A' && c <= L'Z')
-        {
-            c = ((c - L'A' + 13) % 26) + L'A';
-        }
-        else if (c >= L'a' && c <= L'z')
-        {
-            c = ((c - L'a' + 13) % 26) + L'a';
-        }
+        if (L'a' <= ch && ch <= L'z')
+            ch = L'a' + ((ch - L'a' + 13) % 26);
+        else if (L'A' <= ch && ch <= L'Z')
+            ch = L'A' + ((ch - L'A' + 13) % 26);
     }
     return result;
 }
