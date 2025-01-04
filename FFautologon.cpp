@@ -19,8 +19,6 @@
 #include <strsafe.h>
 #include "resource.h"
 
-#define CLASSNAME  L"ffautologon"
-
 inline WORD get_lang_id(void)
 {
     return PRIMARYLANGID(LANGIDFROMLCID(GetThreadLocale()));
