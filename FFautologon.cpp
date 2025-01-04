@@ -17,6 +17,7 @@
 #include <string>
 #include <tchar.h>
 #include <strsafe.h>
+#include "resource.h"
 
 #define CLASSNAME  L"ffautologon"
 
@@ -33,7 +34,7 @@ LPCTSTR get_text(INT id)
     {
         switch (id)
         {
-        case 0: return TEXT("FFautologon バージョン 0.3 by 片山博文MZ");
+        case 0: return TEXT("FFautologon バージョン 0.6 by 片山博文MZ");
         case 1:
             return TEXT("使い方: FFautologon [オプション]\n")
                    TEXT("\n")
@@ -41,6 +42,7 @@ LPCTSTR get_text(INT id)
                    TEXT("  -enable                   自動ログインを有効にする。\n")
                    TEXT("  -disable                  自動ログインを無効にする。\n")
                    TEXT("  -confirm                  自動ログインを変更するか確認する。\n")
+                   TEXT("  -ask_password             パスワードをユーザーに問合せします。\n")
                    TEXT("  -password パスワード      パスワードを指定します。\n")
                    TEXT("  -rot13_pass ROT13PASS     ROT13パスワードを指定します。\n")
                    TEXT("  -help                     このメッセージを表示する。\n")
@@ -67,18 +69,19 @@ LPCTSTR get_text(INT id)
     {
         switch (id)
         {
-        case 0: return TEXT("FFautologon version 0.3 by katahiromz");
+        case 0: return TEXT("FFautologon version 0.6 by katahiromz");
         case 1:
             return TEXT("Usage: FFautologon [Options]\n")
                    TEXT("\n")
                    TEXT("Options\n")
-                   TEXT("  -enable                   Enable auto-logon.\n")
-                   TEXT("  -disable                  Disable auto-logon.\n")
-                   TEXT("  -confirm                  Confirm for changing auto-logon.\n")
-                   TEXT("  -password PASSWORD        Specify the password.\n")
-                   TEXT("  -rot13_pass ROT13PASS     Specify the ROT13 password.\n")
-                   TEXT("  -help                     Display this message.\n")
-                   TEXT("  -version                  Display version info.");
+                   TEXT("  -enable                   Enables auto-logon.\n")
+                   TEXT("  -disable                  Disables auto-logon.\n")
+                   TEXT("  -confirm                  Confirms for changing auto-logon.\n")
+                   TEXT("  -ask_password             Queries the user for the password.\n")
+                   TEXT("  -password PASSWORD        Specifies the password.\n")
+                   TEXT("  -rot13_pass ROT13PASS     Specifies the ROT13 password.\n")
+                   TEXT("  -help                     Displays this message.\n")
+                   TEXT("  -version                  Displays version info.");
         case 2: TEXT("ERROR: No action specified\n");
         case 3: TEXT("FFautologon");
         case 4: TEXT("The current user name is '%ls'. Do you want to enable auto-logon?");
@@ -101,7 +104,56 @@ LPCTSTR get_text(INT id)
     return nullptr;
 }
 
-HWND g_hMainWnd = NULL;
+typedef struct FFAUTOLOGON
+{
+    bool m_enable = false;
+    bool m_disable = false;
+    bool m_confirm = false;
+    bool m_ask_password = false;
+    std::wstring m_password;
+
+    int parse_cmd_line(INT argc, LPWSTR *argv);
+    int run(void);
+    bool enable_auto_logon(LPCWSTR user_name, LPCWSTR password, bool enable = true);
+} FFAUTOLOGON;
+
+INT_PTR CALLBACK
+PasswordDlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    case WM_INITDIALOG:
+        {
+            FFAUTOLOGON *pThis = (FFAUTOLOGON *)lParam;
+            SetWindowLongPtr(hwnd, DWLP_USER, (LONG_PTR)pThis);
+
+            TCHAR user_name[128];
+            DWORD length = _countof(user_name);
+            GetUserName(user_name, &length);
+
+            SetDlgItemText(hwnd, edt2, user_name);
+            SetFocus(GetDlgItem(hwnd, edt1));
+        }
+        return FALSE;
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case IDOK:
+            {
+                FFAUTOLOGON *pThis = (FFAUTOLOGON *)GetWindowLongPtr(hwnd, DWLP_USER);
+                TCHAR password[512];
+                GetDlgItemText(hwnd, edt1, password, _countof(password));
+                pThis->m_password = password;
+                EndDialog(hwnd, IDOK);
+            }
+            break;
+        case IDCANCEL:
+            EndDialog(hwnd, IDCANCEL);
+            break;
+        }
+    }
+    return 0;
+}
 
 void version(void)
 {
@@ -125,18 +177,6 @@ std::wstring rot13(const std::wstring& value)
     }
     return result;
 }
-
-typedef struct FFAUTOLOGON
-{
-    bool m_enable = false;
-    bool m_disable = false;
-    bool m_confirm = false;
-    std::wstring m_password;
-
-    int parse_cmd_line(INT argc, LPWSTR *argv);
-    int run(void);
-    bool enable_auto_logon(LPCWSTR user_name, LPCWSTR password, bool enable = true);
-} FFAUTOLOGON;
 
 bool FFAUTOLOGON::enable_auto_logon(LPCWSTR user_name, LPCWSTR password, bool enable)
 {
@@ -236,6 +276,12 @@ int FFAUTOLOGON::parse_cmd_line(INT argc, LPWSTR *argv)
             continue;
         }
 
+        if (_wcsicmp(arg, L"-ask_password") == 0 || _wcsicmp(arg, L"--ask_password") == 0)
+        {
+            m_ask_password = true;
+            continue;
+        }
+
         if (_wcsicmp(arg, L"-password") == 0 || _wcsicmp(arg, L"--password") == 0)
         {
             if (iarg + 1 < argc)
@@ -268,11 +314,13 @@ int FFAUTOLOGON::parse_cmd_line(INT argc, LPWSTR *argv)
     if (!m_enable && !m_disable)
     {
         _ftprintf(stderr, get_text(2));
+        return 1;
     }
 
     if (m_enable && m_disable)
     {
         _ftprintf(stderr, get_text(6));
+        return 1;
     }
 
     return 0;
@@ -304,6 +352,13 @@ int FFAUTOLOGON::run(void)
         {
             assert(0);
         }
+    }
+
+    if (m_ask_password && m_enable)
+    {
+        if (DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_PASSWORD), NULL,
+                           PasswordDlgProc, (LPARAM)this) == IDCANCEL)
+            return 1;
     }
 
     if (m_enable)
